@@ -16,7 +16,7 @@ Linux环境下cpp日志库，支持日志分级别、自定义文件大小、自
  * 默认提供一个简单的单例类，便于调用
  * 线程安全
  *   
- * 依赖boost库
+ * 依赖boost库，须链接boost_thread、boost_system
  * 效率有待提高
  * 欢迎补充
 
