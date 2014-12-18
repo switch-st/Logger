@@ -196,9 +196,7 @@ public:
                 ret = stat(m_vFileNames[i].c_str(), &f_stat);
                 if (ret)
                 {
-					SET_ERROR(info, errno, std::string("stat file:") + m_vFileNames[i] + std::string(" failed:") + std::string(strerror(errno)));
-					Cleanup();
-					return errno;
+					f_stat.st_size = 0;
                 }
                 m_vCurrentSize.push_back(f_stat.st_size);
                 m_vMutex.push_back(new boost::mutex);
@@ -228,12 +226,16 @@ public:
 			ret = stat(m_vFileNames[0].c_str(), &f_stat);
 			if (ret)
 			{
-                SET_ERROR(info, errno, std::string("stat file:") + m_vFileNames[0] + std::string(" failed:") + std::string(strerror(errno)));
-                fclose(m_vFilePointers[0]);
-                return errno;
+                f_stat.st_size = 0;
 			}
             m_vCurrentSize.push_back(f_stat.st_size);
             m_vMutex.push_back(new boost::mutex);
+		}
+
+		if (!m_bWrite2Device)
+		{
+            boost::thread trd(boost::bind(&Logger::Checker, this));
+            trd.detach();
 		}
 
 		m_bInited = true;
@@ -246,7 +248,7 @@ public:
 		if (!m_bInited)
 		{
 			SET_ERROR(info, SWITCH_LOGGER_ERRNO_NOTINIT, std::string("logger not initialized."));
-			return SWITCH_LOGGER_ERRNO_REINIT;
+			return SWITCH_LOGGER_ERRNO_NOTINIT;
 		}
 
 		va_list ap;
@@ -264,7 +266,7 @@ public:
 		{
 			SET_ERROR(info, SWITCH_LOGGER_ERRNO_NOTINIT, std::string("logger not initialized."));
 			throw info;
-			return SWITCH_LOGGER_ERRNO_REINIT;
+			return SWITCH_LOGGER_ERRNO_NOTINIT;
 		}
 
 		va_list ap;
@@ -361,8 +363,7 @@ private:
 		ret = rename(m_vFileNames[nLevel].c_str(), bkFile.c_str());
 		if (ret)
 		{
-			SET_ERROR(info, errno, std::string("rename file:") + m_vFileNames[nLevel] + std::string(" failed:") + std::string(strerror(errno)));
-			return errno;
+			unlink(m_vFileNames[nLevel].c_str());
 		}
         fp = fopen(m_vFileNames[nLevel].c_str(), "a+");
         if (!fp)
@@ -374,14 +375,50 @@ private:
         ret = stat(m_vFileNames[nLevel].c_str(), &f_stat);
         if (ret)
         {
-        	fclose(fp);
-			SET_ERROR(info, errno, std::string("stat file:") + m_vFileNames[nLevel] + std::string(" failed:") + std::string(strerror(errno)));
-			return errno;
+        	f_stat.st_size = 0;
         }
         m_vFilePointers[nLevel] = fp;
         m_vCurrentSize[nLevel] = f_stat.st_size;
 
 		return 0;
+	}
+
+	void Checker(void)
+	{
+		FILE* fp;
+        struct stat f_stat;
+		int ret;
+
+        if (!m_bInited || m_vMutex.size() != m_vFilePointers.size())
+		{
+			return;
+		}
+		while (1)
+		{
+			for (size_t i = 0; i < m_vMutex.size(); ++i)
+			{
+				boost::lock_guard< boost::mutex > mGuard(*m_vMutex[i]);
+				if (access(m_vFileNames[i].c_str(), F_OK))
+				{
+					fclose(m_vFilePointers[i]);
+					fp = fopen(m_vFileNames[i].c_str(), "a+");
+					if (!fp)
+					{
+						continue;
+					}
+					setvbuf(fp, NULL, _IONBF, 0);
+					ret = stat(m_vFileNames[i].c_str(), &f_stat);
+					if (ret)
+					{
+						f_stat.st_size = 0;
+					}
+					m_vFilePointers[i] = fp;
+					m_vCurrentSize[i] = f_stat.st_size;
+				}
+			}
+            boost::this_thread::sleep(boost::posix_time::minutes(1));
+		}
+
 	}
 
 	void Cleanup(void)
