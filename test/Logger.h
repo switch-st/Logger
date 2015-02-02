@@ -37,6 +37,7 @@ class LoggerSingleton : private Switch::Tool::Logger, public boost::serializatio
 {
 public:
 	int Init(int nBaseLevel, const string& sFilePath, const string& sLogPrefix, bool bIsDev = false);
+	void SetChecker(void);
 	int LogWrite(const std::string& level, const std::string& module, const std::string& format, ...);
 	int LogWrite(const std::string& level, const std::string& module, const std::string& format, va_list ap);
 

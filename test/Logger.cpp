@@ -52,6 +52,11 @@ int LoggerSingleton::Init(int nBaseLevel, const string& sFilePath, const string&
 	return 0;
 }
 
+void LoggerSingleton::SetChecker(void)
+{
+	Switch::Tool::Logger::SetChecker();
+}
+
 int LoggerSingleton::LogWrite(const std::string& level, const std::string& module, const std::string& format, ...)
 {
 	Switch::Tool::ErrorInfo err;

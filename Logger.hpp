@@ -232,15 +232,18 @@ public:
             m_vMutex.push_back(new boost::mutex);
 		}
 
-		if (!m_bWrite2Device)
+		m_bInited = true;
+
+		return 0;
+	}
+
+	void SetChecker(void) 		// 注意：在用户进程fork之后调用SetChecker，因为fork时不会fork检测线程
+	{
+		if (m_bInited && !m_bWrite2Device)
 		{
             boost::thread trd(boost::bind(&Logger::Checker, this));
             trd.detach();
 		}
-
-		m_bInited = true;
-
-		return 0;
 	}
 
 	int LogWrite(ErrorInfo& info, const std::string& level, const std::string& module, const std::string& format, ...)
